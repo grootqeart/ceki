@@ -26,7 +26,7 @@ function meldsNormalValue(melds) {
 }
 
 /**
- * GameEngine represents a single round (deal) of Remi for a fixed set of
+ * GameEngine represents a single round (deal) of Ceki for a fixed set of
  * seated players. A new instance is created for every round; cumulative
  * scoring across rounds is handled by RoomManager.
  *
@@ -65,6 +65,7 @@ class GameEngine {
     }
     this.drawPile = deck; // remaining cards
     this.discardPile = [];
+    this.discardBy = new Map(); // cardId -> playerId who discarded it (for kejebur penalty)
   }
 
   currentPlayerId() {
@@ -211,6 +212,7 @@ class GameEngine {
 
     hand.splice(idx, 1);
     this.discardPile.push(card);
+    this.discardBy.set(card.id, playerId);
     this.hasDrawnThisTurn = false;
 
     // A player who has melded every card to the table and just discarded
@@ -360,22 +362,15 @@ class GameEngine {
         return { type: 'round-ended', result: this.result };
       }
 
-      // Otherwise the needed card must complete the hand exactly (no leftover);
-      // then there is no tutupan and everything scores at the normal tariff.
-      const partition = findPerfectPartition(trialHand);
-      if (!partition) throw new GameError('Kartu itu tidak bisa menutup kartumu');
-      this.discardPile.pop();
-      this.hands.set(playerId, trialHand);
-      const score = meldsNormalValue(table) + meldsNormalValue(partition);
-      this.status = 'ended';
-      this.endReason = 'closed-ceburan';
-      this.result = this._buildRoundEndResult(playerId, score, {
-        method: 'ceburan',
-        ceburanCard: neededCard,
-        tableMelds: table,
-        melds: partition,
-      });
-      return { type: 'round-ended', result: this.result };
+      // A ceburan must leave exactly one card to set aside as the tutupan --
+      // the discard rule always requires discarding a card, so there is no
+      // valid "close with nothing left to discard". If the taken card would
+      // meld every card with no leftover, reject it; the player can still close
+      // via the deck (draw a card and discard it as the tutupan) instead.
+      if (findPerfectPartition(trialHand)) {
+        throw new GameError('Ceburan harus menyisakan 1 kartu tutupan — tutup lewat deck saja');
+      }
+      throw new GameError('Kartu itu tidak bisa menutup kartumu');
     }
 
     throw new GameError('Invalid close source');
@@ -449,6 +444,20 @@ class GameEngine {
       scores[id] = score;
       details[id] = detail;
     }
+
+    // Kejebur penalty: on a ceburan close, the player who discarded the claimed
+    // card pays the closer's high tutupan value, added on top of their own hand
+    // score. The closer's score is unchanged (they already banked the tutupan).
+    // A ceburan that closed with no leftover has no tutupan, so no penalty.
+    if (closerDetail.method === 'ceburan' && closerDetail.tutupanCard && closerDetail.ceburanCard) {
+      const victimId = this.discardBy.get(closerDetail.ceburanCard.id);
+      if (victimId && victimId !== closerId && scores[victimId] !== undefined) {
+        const penalty = cardValue(closerDetail.tutupanCard, 'high');
+        scores[victimId] -= penalty;
+        details[victimId] = { ...details[victimId], kejeburPenalty: penalty };
+      }
+    }
+
     return { reason: closerDetail.method === 'tutupan' ? 'closed-tutupan' : 'closed-ceburan', closerId, scores, details };
   }
 

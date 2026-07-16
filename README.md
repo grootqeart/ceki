@@ -1,6 +1,6 @@
-# Remi Online — Multiplayer Indonesian Rummy
+# Ceki Online — Multiplayer Indonesian Rummy
 
-Real-time multiplayer Remi (Ceki) built with Next.js + Socket.IO + Node.js/Express.
+Real-time multiplayer Ceki (Remi) built with Next.js + Socket.IO + Node.js/Express.
 
 ## Struktur
 
@@ -74,7 +74,7 @@ Buka `http://localhost:3000`. Untuk main dengan teman di jaringan lain, deploy
 
 ## Asumsi desain (bagian yang tidak dirinci eksplisit di spec)
 
-Beberapa aturan Remi punya banyak variasi rumah-ke-rumah. Berikut interpretasi
+Beberapa aturan Ceki punya banyak variasi rumah-ke-rumah. Berikut interpretasi
 yang dipakai di server (`server/game/GameEngine.js`, `shared/combinations.js`):
 
 - Sebuah kombinasi minimal harus punya 1 kartu asli (bukan hanya Joker).

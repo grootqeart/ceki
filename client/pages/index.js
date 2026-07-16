@@ -57,8 +57,8 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-felt flex flex-col items-center justify-center px-4 py-10 text-white">
       <div className="w-full max-w-sm">
-        <h1 className="text-4xl font-bold text-center mb-1 tracking-tight">🃏 Remi Online</h1>
-        <p className="text-center text-white/70 mb-8">Main Remi bareng teman via link</p>
+        <h1 className="text-4xl font-bold text-center mb-1 tracking-tight">🃏 Ceki Online</h1>
+        <p className="text-center text-white/70 mb-8">Main Ceki bareng teman via link</p>
 
         {!mode && (
           <div className="flex flex-col gap-3">

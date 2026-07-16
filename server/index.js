@@ -25,5 +25,5 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Remi server listening on port ${PORT}`);
+  console.log(`Ceki server listening on port ${PORT}`);
 });

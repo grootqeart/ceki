@@ -22,7 +22,7 @@ const PIP_LAYOUTS = {
 // Court cards get a figure glyph so they read as a "picture" card, not a number.
 const COURT_GLYPH = { 11: '♞', 12: '♛', 13: '♚' };
 
-export default function Card({ card, faceDown, selected, small, dimmed, landscape, onClick, interactive, style }) {
+export default function Card({ card, faceDown, selected, melded, small, dimmed, landscape, onClick, interactive, style }) {
   const isInteractive = interactive ?? Boolean(onClick);
   const baseClasses =
     'relative select-none rounded-lg border shadow-md flex items-center justify-center font-bold transition-transform duration-150';
@@ -40,7 +40,7 @@ export default function Card({ card, faceDown, selected, small, dimmed, landscap
         className={`${baseClasses} ${backSize} ${opacityClass} bg-gradient-to-br from-red-700 to-red-900 border-red-950 flex-shrink-0`}
         style={style}
       >
-        <span className="text-white/70 text-[0.55em]">REMI</span>
+        <span className="text-white/70 text-[0.55em]">CEKI</span>
       </div>
     );
   }
@@ -60,13 +60,19 @@ export default function Card({ card, faceDown, selected, small, dimmed, landscap
   const suit = SUIT_SYMBOLS[card.suit];
   const label = rankLabel(card.rank);
 
+  // Selection (yellow) outranks the melded hint (sky) on the same card so the
+  // card you are about to act on never looks ambiguous.
+  const stateClasses = selected
+    ? '-translate-y-3 ring-4 ring-yellow-400'
+    : `${melded ? 'ring-2 ring-sky-400 ' : ''}${isInteractive ? 'hover:-translate-y-1' : ''}`;
+
   const cardBtn = (children) => (
     <button
       type="button"
       onClick={onClick}
-      className={`${baseClasses} ${sizeClasses} ${opacityClass} bg-white ${colorClass} flex-shrink-0 ${
-        selected ? '-translate-y-3 ring-4 ring-yellow-400' : isInteractive ? 'hover:-translate-y-1' : ''
-      } ${isInteractive ? 'cursor-pointer' : 'cursor-default'}`}
+      className={`${baseClasses} ${sizeClasses} ${opacityClass} bg-white ${colorClass} flex-shrink-0 ${stateClasses} ${
+        isInteractive ? 'cursor-pointer' : 'cursor-default'
+      }`}
       style={style}
     >
       {children}

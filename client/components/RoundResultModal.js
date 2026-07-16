@@ -28,7 +28,15 @@ function computeBreakdown(detail) {
   const combos = [...tableMelds, ...melds].reduce((s, m) => s + meldNormalValue(m), 0);
   const tutupan = detail.tutupanCard ? cardValue(detail.tutupanCard, 'high') : 0;
   const minus = (detail.unmeldedCards || []).reduce((s, c) => s + cardValue(c, 'normal'), 0);
-  return { combos, tutupan, minus, hasTutupan: !!detail.tutupanCard, hasCeburan: !!detail.ceburanCard };
+  const kejebur = detail.kejeburPenalty || 0;
+  return {
+    combos,
+    tutupan,
+    minus,
+    kejebur,
+    hasTutupan: !!detail.tutupanCard,
+    hasCeburan: !!detail.ceburanCard,
+  };
 }
 
 function reasonLabel(reason) {
@@ -72,7 +80,7 @@ export default function RoundResultModal({ result, players, isHost, onNextRound,
                     {score}
                   </span>
                 </div>
-                {bd && (bd.combos > 0 || bd.minus > 0 || bd.hasTutupan) && (
+                {bd && (bd.combos > 0 || bd.minus > 0 || bd.hasTutupan || bd.kejebur > 0) && (
                   <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[0.65rem] text-gray-600 mb-1">
                     {bd.combos > 0 && <span>Kombinasi +{bd.combos}</span>}
                     {bd.hasTutupan && (
@@ -82,6 +90,9 @@ export default function RoundResultModal({ result, players, isHost, onNextRound,
                     )}
                     {bd.hasCeburan && <span>Ceburan {cardShort(detail.ceburanCard)} (normal)</span>}
                     {bd.minus > 0 && <span className="text-red-500">Tidak jadi −{bd.minus}</span>}
+                    {bd.kejebur > 0 && (
+                      <span className="text-red-500">Kena kejebur −{bd.kejebur}</span>
+                    )}
                     <span className="font-semibold text-gray-800">= {score >= 0 ? '+' : ''}{score}</span>
                   </div>
                 )}

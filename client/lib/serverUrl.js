@@ -14,7 +14,10 @@ export function getServerUrl() {
     const host = window.location.hostname;
     const isLocalOrLan =
       host === 'localhost' || host === '127.0.0.1' || /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
-    if (isLocalOrLan) return `http://${host}:4000`;
+    // Local/LAN always talk to :4000 on the same host. NEXT_PUBLIC_LOCAL_SERVER_PORT
+    // overrides that port for dev (e.g. running a second copy on :4001) without
+    // changing the production default.
+    if (isLocalOrLan) return `http://${host}:${process.env.NEXT_PUBLIC_LOCAL_SERVER_PORT || 4000}`;
   }
   return process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:4000';
 }

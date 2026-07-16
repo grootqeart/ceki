@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Card from './Card';
-import { bestMeldedSubset } from '../../shared/combinations';
+import { bestMeldedSubset, validateMeld } from '../../shared/combinations';
 import { cardValue } from '../../shared/cardUtils';
 
 const DRAG_THRESHOLD = 8; // px of movement before a press counts as a drag, not a tap
@@ -18,17 +18,70 @@ function meldCardSuit(card, meld) {
   return assign ? assign.suit : null;
 }
 
+function normalValue(card, meld) {
+  if (card.isJoker) {
+    const assign = meld.jokerAssignments.find((j) => j.jokerId === card.id);
+    return cardValue(card, 'normal', assign.rank);
+  }
+  return cardValue(card, 'normal');
+}
+
+// bestMeldedSubset is exponential, so cache its result per leftover-card set
+// (keyed on ids, order-independent) -- during a drag computeMeldGroups reruns
+// on every pointermove but the leftover set rarely changes frame to frame.
+const scatteredMemo = new Map();
+function scatteredMelds(leftover) {
+  if (leftover.length < 3) return [];
+  const key = leftover.map((c) => c.id).slice().sort().join(',');
+  if (scatteredMemo.has(key)) return scatteredMemo.get(key);
+  const { melds } = bestMeldedSubset(leftover, normalValue);
+  const ids = melds.map((m) => m.cards.map((c) => c.id));
+  scatteredMemo.set(key, ids);
+  return ids;
+}
+
+// Maps each card in a valid run/set to its group index, in two passes:
+//   1. Adjacency: the longest ADJACENT valid meld from each position is locked
+//      in, so a manual arrangement decides ambiguous cases (e.g. a joker
+//      between two 9s reads as 9-9-9, but 7-🃏-9 of one suit reads as a run).
+//   2. Leftovers: any still-scattered meld is found via bestMeldedSubset, so a
+//      meld you never lined up is still highlighted where it sits.
+function computeMeldGroups(orderedCards) {
+  const groups = [];
+  const used = new Set();
+
+  let i = 0;
+  while (i < orderedCards.length) {
+    let matched = null;
+    for (let end = orderedCards.length - 1; end >= i + 2; end--) {
+      const window = orderedCards.slice(i, end + 1);
+      if (validateMeld(window)) {
+        matched = window;
+        break;
+      }
+    }
+    if (matched) {
+      groups.push(matched.map((c) => c.id));
+      matched.forEach((c) => used.add(c.id));
+      i += matched.length;
+    } else {
+      i += 1;
+    }
+  }
+
+  const leftover = orderedCards.filter((c) => !used.has(c.id));
+  for (const ids of scatteredMelds(leftover)) groups.push(ids);
+
+  const byCardId = {};
+  groups.forEach((ids, gi) => ids.forEach((id) => { byCardId[id] = gi; }));
+  return byCardId;
+}
+
 // Groups cards that already form a valid run/set together (in rank order),
 // then appends any leftover cards sorted by rank then suit. Jokers holding
 // no meld go last since they're wildcards with no fixed identity.
 function computeSortedOrder(cards) {
-  const { melds, unmeldedCards } = bestMeldedSubset(cards, (card, meld) => {
-    if (card.isJoker) {
-      const assign = meld.jokerAssignments.find((j) => j.jokerId === card.id);
-      return cardValue(card, 'normal', assign.rank);
-    }
-    return cardValue(card, 'normal');
-  });
+  const { melds, unmeldedCards } = bestMeldedSubset(cards, normalValue);
 
   const groups = melds.map((m) => {
     const sortedCards = [...m.cards].sort((a, b) => {
@@ -73,6 +126,22 @@ export default function Hand({ cards, mode = 'discard', selectedCardId, onSelect
 
   const byId = Object.fromEntries(cards.map((c) => [c.id, c]));
   const orderedCards = order.map((id) => byId[id]).filter(Boolean);
+
+  // Keyed on the arrangement, since adjacency now decides ambiguous melds. The
+  // expensive scattered-meld search is cached separately (scatteredMemo), so
+  // re-running this per pointermove during a drag stays cheap.
+  const orderKey = orderedCards.map((c) => c.id).join(',');
+  const meldGroupByCardId = useMemo(() => computeMeldGroups(orderedCards), [orderKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // True when the card at this position touches another card of the same meld,
+  // i.e. the meld reads as a block here rather than being scattered by a drag.
+  function isGrouped(index) {
+    const group = meldGroupByCardId[orderedCards[index]?.id];
+    if (group === undefined) return false;
+    const prev = index > 0 ? meldGroupByCardId[orderedCards[index - 1].id] : undefined;
+    const next = index < orderedCards.length - 1 ? meldGroupByCardId[orderedCards[index + 1].id] : undefined;
+    return group === prev || group === next;
+  }
 
   function handlePointerDown(e, cardId) {
     dragState.current = { id: cardId, startX: e.clientX, startY: e.clientY, moved: false };
@@ -143,18 +212,30 @@ export default function Hand({ cards, mode = 'discard', selectedCardId, onSelect
         {orderedCards.map((card, index) => {
           const isSelected = mode === 'support' ? selectedIds?.includes(card.id) : selectedCardId === card.id;
           const isDragging = draggingId === card.id;
+
+          const meldGroup = meldGroupByCardId[card.id];
+          const inMeld = meldGroup !== undefined;
+          const prevMeldGroup = index === 0 ? undefined : meldGroupByCardId[orderedCards[index - 1].id];
+          // A gap is only worth spending width on where a meld actually sits
+          // together, so it takes a card on one side that has a same-meld
+          // neighbour. A manual arrangement that scatters a meld stays compact
+          // and reads through the lift and ring instead, which work anywhere.
+          const startsGroup =
+            index > 0 && meldGroup !== prevMeldGroup && (isGrouped(index - 1) || isGrouped(index));
+          const overlapClass = index === 0 ? '' : startsGroup ? '-ml-4 sm:-ml-5' : '-ml-10 sm:-ml-11';
+
           return (
             <div
               key={card.id}
               data-card-id={card.id}
-              className={`touch-none ${index === 0 ? '' : '-ml-10 sm:-ml-11'}`}
+              className={`touch-none transition-transform ${overlapClass} ${inMeld ? '-translate-y-2' : ''}`}
               style={{ zIndex: isDragging ? 100 : isSelected ? 60 : index }}
               onPointerDown={(e) => handlePointerDown(e, card.id)}
               onPointerMove={handlePointerMove}
               onPointerUp={(e) => handlePointerUp(e, card.id)}
               onPointerCancel={handlePointerCancel}
             >
-              <Card card={card} selected={isSelected} interactive />
+              <Card card={card} selected={isSelected} melded={inMeld} interactive />
             </div>
           );
         })}
