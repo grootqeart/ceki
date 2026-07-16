@@ -7,6 +7,7 @@ import CekiButton from './CekiButton';
 import ScoreBoard from './ScoreBoard';
 import MiniScoreboard from './MiniScoreboard';
 import VoiceBar from './VoiceBar';
+import LoserMiniGame from './LoserMiniGame';
 import { findPerfectPartition, findClosablePartition } from '../../shared/combinations';
 import { SUIT_SYMBOLS, RANK_LABELS } from '../../shared/constants';
 import { sfx, setMuted, loadMuted } from '../lib/sound';
@@ -55,6 +56,23 @@ export default function GameBoard({ room, game, playerId, actions, socketRef, ro
 
   const me = room.players.find((p) => p.id === playerId);
   const seats = useMemo(() => computeSeats(room.players, playerId), [room.players, playerId]);
+
+  // Between-round mini-game: when a new round starts, the sole last-place player
+  // (fewest cumulative points) must tap 50x before their board is revealed.
+  const [showMiniGame, setShowMiniGame] = useState(false);
+  const handledRoundRef = useRef(room.round);
+  useEffect(() => {
+    if (room.round === handledRoundRef.current) return;
+    handledRoundRef.current = room.round;
+    const scores = room.cumulativeScores || {};
+    const ids = room.players.map((p) => p.id);
+    const vals = ids.map((id) => scores[id] || 0);
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    if (min === max) return; // all tied (e.g. the opening round) -> no single loser
+    const losers = ids.filter((id) => (scores[id] || 0) === min);
+    if (losers.length === 1 && losers[0] === playerId) setShowMiniGame(true);
+  }, [room.round, room.cumulativeScores, room.players, playerId]);
   const isMyTurn = game.turnPlayerId === playerId;
   const canDraw = isMyTurn && !game.hasDrawnThisTurn && !pendingMeld;
   const canDiscard = isMyTurn && game.hasDrawnThisTurn;
@@ -185,6 +203,7 @@ export default function GameBoard({ room, game, playerId, actions, socketRef, ro
 
   return (
     <div className="relative min-h-screen bg-felt flex flex-col text-white overflow-hidden w-full">
+      {showMiniGame && <LoserMiniGame onDone={() => setShowMiniGame(false)} />}
       <header className="flex items-center justify-between px-3 py-2 bg-black/20 gap-2">
         <span className="font-bold tracking-widest text-sm">{room.code}</span>
         <span className="text-sm font-medium truncate">
