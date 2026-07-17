@@ -242,12 +242,17 @@ function isOneCardAwayFromClosed(hand) {
 // require that a specific card (e.g. one just taken from the discard pile for
 // a ceburan) is actually USED inside a meld rather than immediately set aside.
 function findClosablePartition(cards, excludeLeftoverId) {
-  for (let i = 0; i < cards.length; i++) {
-    if (cards[i].isJoker) continue;
-    if (excludeLeftoverId && cards[i].id === excludeLeftoverId) continue;
-    const rest = cards.slice(0, i).concat(cards.slice(i + 1));
-    const melds = findPerfectPartition(rest);
-    if (melds) return { leftover: cards[i], melds };
+  // Prefer a natural card as the leftover (tutupan); only fall back to setting
+  // aside a joker when no natural card can be. A joker normally can't be
+  // discarded, but a closing tutupan is the exception.
+  for (const jokerPass of [false, true]) {
+    for (let i = 0; i < cards.length; i++) {
+      if (cards[i].isJoker !== jokerPass) continue;
+      if (excludeLeftoverId && cards[i].id === excludeLeftoverId) continue;
+      const rest = cards.slice(0, i).concat(cards.slice(i + 1));
+      const melds = findPerfectPartition(rest);
+      if (melds) return { leftover: cards[i], melds };
+    }
   }
   return null;
 }

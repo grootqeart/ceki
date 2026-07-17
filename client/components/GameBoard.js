@@ -131,8 +131,9 @@ export default function GameBoard({ room, game, playerId, actions, socketRef, ro
 
   // Tutupan close: after drawing, if discarding the selected card leaves a
   // perfect meld partition, offer to close (the selected card is the tutupan).
+  // A joker may be the tutupan here even though it can't be discarded normally.
   const canCloseByDiscardingSelected = useMemo(() => {
-    if (!iAnnouncedCeki || !canDiscard || !selectedCard || selectedCard.isJoker) return false;
+    if (!iAnnouncedCeki || !canDiscard || !selectedCard) return false;
     const rest = game.myHand.filter((c) => c.id !== selectedCard.id);
     return !!findPerfectPartition(rest);
   }, [iAnnouncedCeki, canDiscard, selectedCard, game.myHand]);
@@ -287,17 +288,29 @@ export default function GameBoard({ room, game, playerId, actions, socketRef, ro
           </button>
         )}
         {/* Tutupan: after drawing, discarding the selected card leaves a
-            perfect meld partition, so this discard closes the round. */}
+            perfect meld partition. Offer to close, but also allow a plain
+            discard so a player can hold their hand instead of closing yet.
+            (A joker can be the tutupan but still can't be discarded normally.) */}
         {canDiscard && !pendingMeld && canCloseByDiscardingSelected && (
-          <button
-            className="px-5 py-2.5 rounded-full bg-emerald-400 hover:bg-emerald-300 text-feltDark font-bold shadow-xl animate-pulse"
-            onClick={() => {
-              actions.closeCard('leftover', selectedCard.id);
-              setSelectedCardId(null);
-            }}
-          >
-            🎯 Tutup! (buang {selectedCard && (selectedCard.isJoker ? '🃏' : `${RANK_LABELS[selectedCard.rank] || selectedCard.rank}${SUIT_SYMBOLS[selectedCard.suit]}`)} sebagai tutupan)
-          </button>
+          <div className="flex flex-col items-center gap-2">
+            <button
+              className="px-5 py-2.5 rounded-full bg-emerald-400 hover:bg-emerald-300 text-feltDark font-bold shadow-xl animate-pulse"
+              onClick={() => {
+                actions.closeCard('leftover', selectedCard.id);
+                setSelectedCardId(null);
+              }}
+            >
+              🎯 Tutup! (buang {selectedCard && (selectedCard.isJoker ? '🃏' : `${RANK_LABELS[selectedCard.rank] || selectedCard.rank}${SUIT_SYMBOLS[selectedCard.suit]}`)} sebagai tutupan)
+            </button>
+            {!selectedCard.isJoker && (
+              <button
+                className="px-4 py-1.5 rounded-full bg-white/15 hover:bg-white/25 text-white text-sm font-medium"
+                onClick={confirmDiscard}
+              >
+                Buang biasa (tanpa tutup)
+              </button>
+            )}
+          </div>
         )}
         {canDiscard && !pendingMeld && selectedCard && !canCloseByDiscardingSelected && (
           <button

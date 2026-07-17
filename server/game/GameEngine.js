@@ -272,7 +272,8 @@ class GameEngine {
     const idx = hand.findIndex((c) => c.id === cardId);
     if (idx === -1) throw new GameError('Card not in hand');
     const leftover = hand[idx];
-    if (leftover.isJoker) throw new GameError('Joker tidak bisa dibuang');
+    // A joker normally can't be discarded, but it may be set aside as the
+    // tutupan when closing (the round ends, so it never re-enters play).
 
     const rest = hand.slice(0, idx).concat(hand.slice(idx + 1));
     const melds = findPerfectPartition(rest);
@@ -382,14 +383,16 @@ class GameEngine {
   }
 
   // Finds a card to set aside (leftover) such that the rest perfectly
-  // partitions into melds. Jokers are never valid leftovers (can't discard).
+  // partitions into melds. Prefers a natural leftover; a joker is only set
+  // aside as the tutupan when no natural card can be.
   _findClosablePartition(cards) {
-    for (let i = 0; i < cards.length; i++) {
-      const candidate = cards[i];
-      if (candidate.isJoker) continue;
-      const rest = cards.slice(0, i).concat(cards.slice(i + 1));
-      const melds = findPerfectPartition(rest);
-      if (melds) return { leftover: candidate, melds };
+    for (const jokerPass of [false, true]) {
+      for (let i = 0; i < cards.length; i++) {
+        if (cards[i].isJoker !== jokerPass) continue;
+        const rest = cards.slice(0, i).concat(cards.slice(i + 1));
+        const melds = findPerfectPartition(rest);
+        if (melds) return { leftover: cards[i], melds };
+      }
     }
     return null;
   }
