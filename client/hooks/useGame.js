@@ -104,6 +104,7 @@ export function useGame(roomCode) {
 
   const startGame = useCallback(() => emit('start-game'), [emit]);
   const startNextRound = useCallback(() => emit('start-next-round'), [emit]);
+  const finishMiniGame = useCallback(() => emit('minigame-done'), [emit]);
   const drawCard = useCallback(() => emit('draw-card'), [emit]);
   const drawFromDiscard = useCallback(
     ({ count, supportingCardIds }) => emit('draw-from-discard', { count, supportingCardIds }),
@@ -128,6 +129,7 @@ export function useGame(roomCode) {
     submitName,
     startGame,
     startNextRound,
+    finishMiniGame,
     drawCard,
     drawFromDiscard,
     discardCard,

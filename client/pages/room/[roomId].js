@@ -5,6 +5,7 @@ import Lobby from '../../components/Lobby';
 import GameBoard from '../../components/GameBoard';
 import RoundResultModal from '../../components/RoundResultModal';
 import GameOverModal from '../../components/GameOverModal';
+import LoserMiniGame from '../../components/LoserMiniGame';
 
 export default function RoomPage() {
   const router = useRouter();
@@ -25,6 +26,7 @@ export default function RoomPage() {
     submitName,
     startGame,
     startNextRound,
+    finishMiniGame,
     drawCard,
     drawFromDiscard,
     discardCard,
@@ -90,7 +92,7 @@ export default function RoomPage() {
     <>
       {(room.status === 'waiting') && <Lobby room={room} playerId={playerId} onStart={startGame} />}
 
-      {room.status !== 'waiting' && game && (
+      {room.status !== 'waiting' && room.status !== 'minigame' && game && (
         <GameBoard
           room={room}
           game={game}
@@ -102,7 +104,21 @@ export default function RoomPage() {
         />
       )}
 
-      {roundResult && !gameOverInfo && (
+      {room.status === 'minigame' && room.miniGame && (
+        room.miniGame.loserId === playerId ? (
+          <LoserMiniGame target={room.miniGame.target} onDone={finishMiniGame} />
+        ) : (
+          <main className="min-h-screen bg-felt flex flex-col items-center justify-center px-6 text-white text-center">
+            <p className="text-6xl mb-4">🃏</p>
+            <p className="text-lg font-semibold">
+              Menunggu {room.players.find((p) => p.id === room.miniGame.loserId)?.name || 'pemain'}
+            </p>
+            <p className="text-white/70 mt-1">menyelesaikan tap untuk mengocok kartu…</p>
+          </main>
+        )
+      )}
+
+      {roundResult && !gameOverInfo && room.status === 'round-over' && (
         <RoundResultModal
           result={roundResult.result}
           players={room.players}

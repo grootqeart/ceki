@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react';
 
-const TARGET = 50;
-
-// Full-screen gate shown to the current last-place player at the start of a new
-// round: they must tap the screen (or press space) TARGET times before their
-// board is revealed. Purely local to this player's screen.
-export default function LoserMiniGame({ onDone }) {
+// Full-screen gate shown to the current last-place player before a new round:
+// they must tap the screen (or press space) `target` times before the round is
+// dealt. `target` escalates 50 per consecutive last-place round (max 400).
+export default function LoserMiniGame({ target = 50, onDone }) {
+  const TARGET = target;
   const [count, setCount] = useState(0);
 
   useEffect(() => {
     function onKey(e) {
       if (e.code === 'Space' || e.key === ' ') {
+        // Always stop the default (page scroll / activating a focused button
+        // behind the overlay), but only count a genuine press -- e.repeat is
+        // true for the auto-repeat stream from a held-down key, which would
+        // otherwise fill the counter on its own.
         e.preventDefault();
+        if (e.repeat) return;
         setCount((c) => Math.min(c + 1, TARGET));
       }
     }

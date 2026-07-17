@@ -81,6 +81,21 @@ function registerSocketHandlers(io, socket, roomManager) {
     safe(() => {
       const { roomCode, playerId } = socket.data;
       const room = roomManager.startNextRound(roomCode, playerId);
+      // If a last-place player owes the tap penalty, the round is not dealt yet;
+      // just broadcast the 'minigame' state so everyone waits. Otherwise the
+      // round has actually started.
+      if (room.status !== 'minigame') {
+        io.to(roomCode).emit(E.GAME_STARTED, { room: roomManager.getRoomSummary(room) });
+      }
+      broadcastRoomState(io, roomManager, room);
+    })
+  );
+
+  socket.on(
+    'minigame-done',
+    safe(() => {
+      const { roomCode, playerId } = socket.data;
+      const room = roomManager.completeMiniGame(roomCode, playerId);
       io.to(roomCode).emit(E.GAME_STARTED, { room: roomManager.getRoomSummary(room) });
       broadcastRoomState(io, roomManager, room);
     })

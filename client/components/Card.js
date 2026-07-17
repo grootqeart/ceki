@@ -39,9 +39,7 @@ export default function Card({ card, faceDown, selected, melded, small, dimmed, 
       <div
         className={`${baseClasses} ${backSize} ${opacityClass} bg-gradient-to-br from-red-700 to-red-900 border-red-950 flex-shrink-0`}
         style={style}
-      >
-        <span className="text-white/70 text-[0.55em]">CEKI</span>
-      </div>
+      />
     );
   }
 

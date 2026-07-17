@@ -334,6 +334,11 @@ class GameEngine {
     }
 
     if (source === 'discard') {
+      // Kejebur only reaches the immediately-preceding player's discard: that
+      // card is the top of the pile exactly during your own turn, so a ceburan
+      // is only allowed on your turn (no jumping ahead of the player between
+      // you and the discarder).
+      if (!this.isPlayersTurn(playerId)) throw new GameError('Ceburan hanya boleh saat giliranmu');
       if (this.discardPile.length === 0) throw new GameError('Discard pile is empty');
       const hand = this.getHand(playerId);
       const neededCard = this.topDiscard();

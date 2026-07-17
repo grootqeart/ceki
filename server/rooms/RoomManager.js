@@ -40,6 +40,7 @@ class RoomManager {
       engine: null,
       winnerId: null,
       round: 0,
+      miniGame: null, // { loserId, target } while a between-round tap penalty is pending
     };
     this.rooms.set(code, room);
     return { room, playerId };
@@ -111,6 +112,7 @@ class RoomManager {
 
   _startNewRound(room) {
     room.status = 'playing';
+    room.miniGame = null;
     room.round += 1;
     const starterId = this._pickStartingPlayer(room);
     room.engine = new GameEngine(
@@ -179,12 +181,58 @@ class RoomManager {
     }
   }
 
+  // The sole last-place player for a given standing, or null (tie / all equal).
+  _soleLastPlace(scores, ids) {
+    const vals = ids.map((id) => scores[id] || 0);
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    if (min === max) return null;
+    const losers = ids.filter((id) => (scores[id] || 0) === min);
+    return losers.length === 1 ? losers[0] : null;
+  }
+
+  // How many consecutive most-recent standings had `playerId` as the sole last
+  // place. Drives the escalating tap penalty (50 per consecutive round).
+  _lastPlaceStreak(room, playerId) {
+    const ids = room.players.map((p) => p.id);
+    let streak = 0;
+    for (let i = room.scoreHistory.length - 1; i >= 0; i--) {
+      if (this._soleLastPlace(room.scoreHistory[i].cumulative || {}, ids) === playerId) streak++;
+      else break;
+    }
+    return streak;
+  }
+
   startNextRound(code, requesterId) {
     const room = this.getRoom(code);
     if (!room) throw new GameError('Room not found');
     const requester = room.players.find((p) => p.id === requesterId);
     if (!requester || !requester.isHost) throw new GameError('Only the host can start the next round');
     if (room.status !== 'round-over') throw new GameError('Round is not over');
+
+    // A single last-place player owes a tap penalty before the round can start:
+    // 50 taps per consecutive last-place round, capped at 400. Everyone else
+    // waits (the round is not dealt until they finish).
+    const ids = room.players.map((p) => p.id);
+    const loserId = this._soleLastPlace(room.cumulativeScores, ids);
+    if (loserId) {
+      const streak = this._lastPlaceStreak(room, loserId);
+      room.status = 'minigame';
+      room.miniGame = { loserId, target: Math.min(50 * streak, 400) };
+    } else {
+      this._startNewRound(room);
+    }
+    return room;
+  }
+
+  completeMiniGame(code, requesterId) {
+    const room = this.getRoom(code);
+    if (!room) throw new GameError('Room not found');
+    if (room.status !== 'minigame') throw new GameError('No mini-game in progress');
+    if (!room.miniGame || room.miniGame.loserId !== requesterId) {
+      throw new GameError('Only the last-place player can finish the mini-game');
+    }
+    room.miniGame = null;
     this._startNewRound(room);
     return room;
   }
@@ -205,6 +253,7 @@ class RoomManager {
       scoreHistory: room.scoreHistory,
       winnerId: room.winnerId,
       round: room.round,
+      miniGame: room.miniGame || null,
     };
   }
 }
