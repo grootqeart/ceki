@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { GameEngine, GameError } = require('../game/GameEngine');
+const store = require('../store');
 const { MIN_PLAYERS, MAX_PLAYERS, VALID_TARGET_SCORES, ROOM_CODE_LENGTH } = require('../../shared/constants');
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous 0/O/1/I
@@ -85,6 +86,63 @@ class RoomManager {
       }
     }
     return null;
+  }
+
+  // --- Persistence (Redis, optional) --------------------------------
+
+  // Fire-and-forget snapshot of a room to the store after a state change.
+  persist(room) {
+    if (!room || !store.isEnabled()) return;
+    store.saveRoom(room.code, this._serializeRoom(room));
+  }
+
+  _serializeRoom(room) {
+    return JSON.stringify({
+      code: room.code,
+      settings: room.settings,
+      players: room.players,
+      status: room.status,
+      cumulativeScores: room.cumulativeScores,
+      scoreHistory: room.scoreHistory,
+      winnerId: room.winnerId,
+      round: room.round,
+      miniGame: room.miniGame || null,
+      startPlayerId: room.startPlayerId || null,
+      engine: room.engine ? room.engine.toJSON() : null,
+    });
+  }
+
+  _deserializeRoom(json) {
+    const o = JSON.parse(json);
+    return {
+      code: o.code,
+      settings: o.settings,
+      // Socket bindings don't survive a restart -- everyone starts disconnected
+      // and re-attaches when their client reconnects with its stored playerId.
+      players: (o.players || []).map((p) => ({ ...p, socketId: null, connected: false })),
+      status: o.status,
+      cumulativeScores: o.cumulativeScores || {},
+      scoreHistory: o.scoreHistory || [],
+      engine: o.engine ? GameEngine.fromJSON(o.engine) : null,
+      winnerId: o.winnerId || null,
+      round: o.round || 0,
+      miniGame: o.miniGame || null,
+      startPlayerId: o.startPlayerId || null,
+    };
+  }
+
+  // Loads any persisted rooms from the store into memory on startup.
+  async restore() {
+    const blobs = await store.loadAllRooms();
+    for (const json of blobs) {
+      try {
+        const room = this._deserializeRoom(json);
+        this.rooms.set(room.code, room);
+      } catch (err) {
+        console.error('Failed to restore a room:', err.message);
+      }
+    }
+    if (blobs.length) console.log(`Persistence: restored ${this.rooms.size} room(s) from Redis`);
   }
 
   getRoom(code) {

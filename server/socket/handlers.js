@@ -2,6 +2,7 @@ const { GameError } = require('../game/GameEngine');
 const { SOCKET_EVENTS: E } = require('../../shared/constants');
 
 function broadcastRoomState(io, roomManager, room) {
+  roomManager.persist(room); // snapshot to Redis after every state change (no-op if disabled)
   const summary = roomManager.getRoomSummary(room);
   for (const player of room.players) {
     if (!player.connected || !player.socketId) continue;
@@ -36,6 +37,7 @@ function registerSocketHandlers(io, socket, roomManager) {
       socket.data.roomCode = room.code;
       socket.data.playerId = playerId;
 
+      roomManager.persist(room);
       const summary = roomManager.getRoomSummary(room);
       socket.emit(E.ROOM_CREATED, { roomCode: room.code, playerId, room: summary });
       if (typeof ack === 'function') ack({ ok: true, roomCode: room.code, playerId, room: summary });

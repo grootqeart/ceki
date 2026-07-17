@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { RoomManager } = require('./rooms/RoomManager');
 const { registerSocketHandlers } = require('./socket/handlers');
+const store = require('./store');
 
 const PORT = process.env.PORT || 4000;
 // In production, set CLIENT_ORIGIN to lock CORS down to your real frontend
@@ -24,6 +25,18 @@ io.on('connection', (socket) => {
   registerSocketHandlers(io, socket, roomManager);
 });
 
-server.listen(PORT, () => {
-  console.log(`Ceki server listening on port ${PORT}`);
-});
+// Connect to Redis (if configured) and reload any persisted rooms before we
+// start accepting connections, so a restart resumes in-progress games.
+async function start() {
+  try {
+    await store.initStore();
+    await roomManager.restore();
+  } catch (err) {
+    console.error('Persistence unavailable, continuing in-memory:', err.message);
+  }
+  server.listen(PORT, () => {
+    console.log(`Ceki server listening on port ${PORT}`);
+  });
+}
+
+start();

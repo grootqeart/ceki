@@ -507,6 +507,48 @@ class GameEngine {
       tableMelds: Object.fromEntries(this.playerIds.map((id) => [id, this.tableMelds.get(id) || []])),
     };
   }
+
+  // Full internal state as a plain (JSON-safe) object -- Maps become objects.
+  // Used to persist an in-progress round so it survives a server restart.
+  toJSON() {
+    return {
+      playerIds: this.playerIds,
+      hands: Object.fromEntries(this.hands),
+      tableMelds: Object.fromEntries(this.tableMelds),
+      ceki: Object.fromEntries(this.ceki),
+      cekiEligible: Object.fromEntries(this.cekiEligible),
+      discardMeldUnlocked: Object.fromEntries(this.discardMeldUnlocked),
+      discardBy: Object.fromEntries(this.discardBy),
+      turnIndex: this.turnIndex,
+      hasDrawnThisTurn: this.hasDrawnThisTurn,
+      status: this.status,
+      endReason: this.endReason,
+      result: this.result,
+      drawPile: this.drawPile,
+      discardPile: this.discardPile,
+    };
+  }
+
+  // Rebuilds an engine from toJSON() output WITHOUT dealing a fresh deck (the
+  // constructor shuffles/deals, which we must not do when restoring).
+  static fromJSON(o) {
+    const e = Object.create(GameEngine.prototype);
+    e.playerIds = o.playerIds;
+    e.hands = new Map(Object.entries(o.hands));
+    e.tableMelds = new Map(Object.entries(o.tableMelds));
+    e.ceki = new Map(Object.entries(o.ceki));
+    e.cekiEligible = new Map(Object.entries(o.cekiEligible));
+    e.discardMeldUnlocked = new Map(Object.entries(o.discardMeldUnlocked));
+    e.discardBy = new Map(Object.entries(o.discardBy));
+    e.turnIndex = o.turnIndex;
+    e.hasDrawnThisTurn = o.hasDrawnThisTurn;
+    e.status = o.status;
+    e.endReason = o.endReason;
+    e.result = o.result;
+    e.drawPile = o.drawPile;
+    e.discardPile = o.discardPile;
+    return e;
+  }
 }
 
 class GameError extends Error {}
